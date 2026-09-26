@@ -1,258 +1,194 @@
 # Single-cell RNA-seq analysis of PBMC 3k
 
-## Overview
+[![R](https://img.shields.io/badge/R-single--cell%20analysis-276DC3?logo=r&logoColor=white)](https://www.r-project.org/)
+[![Seurat](https://img.shields.io/badge/Seurat-scRNA--seq-6A5ACD)](https://satijalab.org/seurat/)
+[![Dataset](https://img.shields.io/badge/Dataset-PBMC%203k-2E8B57)](https://satijalab.org/seurat/articles/pbmc3k_tutorial)
 
-This project presents a complete single-cell RNA sequencing (scRNA-seq) analysis workflow applied to the **PBMC 3k** dataset using **R** and **Seurat**.
+A portfolio project demonstrating a complete **single-cell RNA-seq analysis workflow** on the PBMC 3k reference dataset using **R, Seurat and Bioconductor**.
 
-The objective was to build a clear, reproducible and biologically interpretable workflow covering the main stages of a standard scRNA-seq analysis, from quality control to cell-type annotation and downstream biological exploration.
+The objective is not only to recover the major PBMC populations, but to show the reasoning behind a standard scRNA-seq workflow: quality control, doublet detection, normalization, dimensionality reduction, clustering, marker analysis, biological annotation and targeted downstream exploration.
 
-The analysis includes:
+## Project at a glance
 
-- quality control of single-cell transcriptomic data;
-- detection and removal of predicted doublets;
-- evaluation of cell-cycle effects;
-- normalization using **SCTransform**;
-- dimensionality reduction using **PCA** and **UMAP**;
-- graph-based clustering;
-- identification of cluster-specific marker genes;
-- manual cell-type annotation based on canonical markers;
-- sub-clustering of the T/NK compartment;
-- pseudotime analysis of the monocyte compartment using **Slingshot**;
-- exploratory analysis of candidate ligand–receptor expression;
-- gene-signature scoring using **AUCell**.
+**Biological system:** human peripheral blood mononuclear cells  
+**Data type:** single-cell RNA sequencing  
+**Main language:** R  
+**Core tools:** Seurat, SCTransform, scDblFinder, SingleCellExperiment, Slingshot, AUCell  
+**Main tasks:** QC, clustering, annotation, sub-clustering, trajectory analysis and gene-signature scoring
+
+## Biological question
+
+Can major immune-cell populations and finer transcriptional structure be recovered from a reference PBMC scRNA-seq dataset using a rigorous and biologically interpretable analysis workflow?
+
+The analysis focuses on both the **global immune-cell landscape** and selected downstream questions within transcriptionally related compartments.
 
 ## Dataset
 
-The project uses the **PBMC 3k** dataset distributed through the SeuratData ecosystem. The starting dataset contains approximately **2,700 cells** and **13,714 detected genes**.
+The project uses the **PBMC 3k** dataset distributed through the Seurat ecosystem. It contains approximately **2,700 cells** and **13,714 detected genes**.
 
-PBMCs (Peripheral Blood Mononuclear Cells) include several major immune-cell populations such as T lymphocytes, B lymphocytes, NK cells, monocytes and dendritic cells.
+PBMCs include several major immune populations, including:
 
-Useful resources:
+- CD4+ and CD8+ T cells
+- B cells
+- NK cells
+- CD14+ monocytes
+- FCGR3A+ monocytes
+- dendritic cells
+- platelets
 
-- Seurat PBMC 3k tutorial: https://satijalab.org/seurat/articles/pbmc3k_tutorial
-- SeuratData: https://github.com/satijalab/seurat-data
+Reference dataset and tutorial:  
+https://satijalab.org/seurat/articles/pbmc3k_tutorial
 
 ## Analysis workflow
 
 ### 1. Quality control
 
-Several commonly used scRNA-seq quality metrics were examined: the number of genes detected per cell (`nFeature_RNA`), total RNA counts (`nCount_RNA`), mitochondrial transcript percentage and ribosomal transcript percentage.
+Cell-level quality metrics were examined before downstream analysis:
 
-Cells with very low transcriptomic complexity, unusually high gene counts or excessive mitochondrial RNA were filtered before downstream analysis. Relationships between RNA counts, detected genes and mitochondrial content were also inspected to identify atypical cells.
+- number of detected genes per cell
+- total RNA counts
+- mitochondrial transcript percentage
+- ribosomal transcript percentage
+
+Low-complexity cells, cells with unusually high feature counts and cells with excessive mitochondrial RNA were excluded using predefined QC criteria.
 
 ### 2. Doublet detection
 
-Potential doublets were detected using **scDblFinder**. Doublets correspond to droplets containing RNA from more than one cell and can create artificial hybrid transcriptomic profiles that distort dimensionality reduction, clustering and marker-gene identification.
+Potential doublets were identified with **scDblFinder** and removed before the final normalization and clustering workflow.
 
-Predicted doublets were removed before the main normalization and clustering workflow.
-
-Reference: https://bioconductor.org/packages/scDblFinder/
+Doublet removal is important because multiplets can generate artificial hybrid transcriptional profiles and distort both clustering and marker-gene identification.
 
 ### 3. Cell-cycle assessment
 
-Cell-cycle scores were calculated using canonical S-phase and G2/M-phase gene sets. A PCA restricted to cell-cycle-associated genes was used as a diagnostic analysis to assess whether cell-cycle variation strongly structured the dataset.
+S-phase and G2/M scores were calculated using canonical cell-cycle gene sets.
 
-This step was used for interpretation rather than as an automatic reason to regress out biological variation.
+A PCA restricted to cell-cycle-associated genes was used as a diagnostic step to assess whether cell-cycle variation strongly structured the dataset. Cell-cycle signal was interpreted rather than automatically removed.
 
 ### 4. SCTransform normalization
 
-The filtered singlet cells were normalized using **SCTransform v2**. SCTransform models UMI counts using a regularized negative-binomial framework and reduces the dependence between sequencing depth and normalized gene expression.
+Filtered singlets were normalized with **SCTransform v2**, with mitochondrial percentage included as a technical covariate.
 
-Mitochondrial percentage was included as a variable to regress during this step.
+SCTransform was used to stabilize variance and reduce the dependence between sequencing depth and normalized expression.
 
-Reference: https://satijalab.org/seurat/articles/sctransform_vignette
+### 5. PCA and dimensionality selection
 
-### 5. Principal component analysis
+Principal component analysis was performed on the normalized expression matrix.
 
-PCA was performed on the SCTransform-normalized data. An elbow plot was examined to evaluate the amount of information captured by successive principal components.
+An elbow plot was used to inspect the information carried by successive components, and the first **20 principal components** were retained for the main neighborhood graph, clustering and UMAP representation.
 
-The first **20 principal components** were retained for construction of the neighborhood graph, clustering and UMAP representation.
+### 6. Graph-based clustering and UMAP
 
-### 6. Neighborhood graph and clustering
+A nearest-neighbor graph was built from the selected PCs and clustered using Seurat's graph-based framework.
 
-A nearest-neighbor graph was constructed from the selected principal components. Graph-based clustering was then performed using the Louvain algorithm through Seurat.
+UMAP was used for two-dimensional visualization of the transcriptional structure.
 
-The resulting clusters represent groups of cells with similar transcriptomic profiles. Cluster numbers themselves have no intrinsic biological meaning and were interpreted only after marker-gene analysis.
+Cluster labels were treated as computational groups only; biological meaning was assigned after marker analysis.
 
-### 7. UMAP visualization
+### 7. Marker-gene analysis and cell-type annotation
 
-UMAP was used to project the high-dimensional transcriptomic structure into two dimensions.
+Cluster-specific markers were identified and compared with canonical immune-cell genes.
 
-The UMAP representation provides an intuitive visualization of transcriptionally similar cells but should not be interpreted as a quantitative measure of biological distance between clusters.
+Representative markers included:
 
-### 8. Marker-gene identification
+| Cell population | Example markers |
+|---|---|
+| T cells | CD3D, CD3E, CCR7, IL7R, CD8A |
+| B cells | MS4A1, CD79A, CD79B |
+| NK cells | NKG7, GNLY, PRF1 |
+| CD14+ monocytes | CD14, LYZ, S100A8, S100A9 |
+| FCGR3A+ monocytes | FCGR3A, MS4A7, LST1 |
+| Dendritic cells | FCER1A, CST3 |
+| Platelets | PPBP, PF4 |
 
-Cluster-specific marker genes were identified using Seurat's differential-expression framework. Only positively enriched markers were retained, with minimum expression-frequency and log-fold-change thresholds.
+Cell identities were assigned manually using multiple consistent markers rather than relying on cluster numbers alone.
 
-Marker genes were compared with known immune-cell markers to support biological interpretation of each cluster.
+### 8. T/NK sub-clustering
 
-Examples of markers examined include:
+The T/NK compartment was isolated and reprocessed independently to explore finer immune heterogeneity that can be masked in the global PBMC analysis.
 
-- T cells: `CD3D`, `CD3E`, `CCR7`, `IL7R`, `CD8A`;
-- B cells: `MS4A1`, `CD79A`, `CD79B`;
-- NK cells: `NKG7`, `GNLY`, `PRF1`;
-- CD14+ monocytes: `CD14`, `LYZ`, `S100A8`, `S100A9`;
-- FCGR3A+ monocytes: `FCGR3A`, `MS4A7`, `LST1`;
-- dendritic cells: `FCER1A`, `CST3`;
-- platelets: `PPBP`, `PF4`.
+Markers examined included CCR7, IL7R, CD8A, GZMK, CCL5, NKG7, GNLY, PRF1, IL2RA, CTLA4 and FOXP3.
 
-### 9. Cell-type annotation
+This analysis is exploratory; fine cell-state annotation requires support from multiple markers and, ideally, external validation.
 
-Cell types were assigned manually after examination of cluster-specific differential-expression results, canonical immune-cell markers and global expression patterns shown in DotPlots and UMAP representations.
+### 9. Monocyte trajectory analysis
 
-Manual annotation was deliberately preferred over assigning identities solely from cluster numbers.
+A targeted pseudotime analysis was performed with **Slingshot** on transcriptionally related myeloid populations.
 
-### 10. T/NK sub-clustering
+The trajectory was restricted to the monocyte compartment rather than being forced across unrelated PBMC lineages.
 
-The T/NK compartment was isolated and reprocessed independently. A new SCTransform normalization, PCA, neighborhood graph, clustering and UMAP were performed on this subset.
+Pseudotime is interpreted as an inferred transcriptional ordering, **not** as real chronological time or direct proof of lineage progression.
 
-The goal was to investigate finer transcriptional heterogeneity that may be obscured during clustering of all PBMC populations together.
+### 10. Candidate ligand-receptor exploration
 
-Markers including `CCR7`, `IL7R`, `CD8A`, `GZMK`, `CCL5`, `NKG7`, `GNLY`, `PRF1`, `IL2RA`, `CTLA4` and `FOXP3` were examined.
+Selected ligand and receptor genes were compared across annotated cell populations.
 
-This analysis is exploratory and fine cell-state annotation requires validation using multiple consistent markers.
+This analysis is descriptive: compatible ligand-receptor expression does **not** by itself demonstrate functional cell-cell communication.
 
-### 11. Monocyte pseudotime analysis
+### 11. AUCell gene-signature scoring
 
-A targeted trajectory analysis was performed on the monocyte compartment using **Slingshot**.
+**AUCell** was used to score predefined transcriptional signatures at the single-cell level.
 
-Rather than constructing a trajectory across unrelated PBMC lineages, the analysis was restricted to transcriptionally related monocyte populations. A pseudotime value was inferred for each cell to represent its relative position along the inferred transcriptional continuum.
+This provides an additional view of whether expected biological programs are enriched in the corresponding cell populations.
 
-Pseudotime should not be interpreted as real chronological time or as direct experimental proof of lineage progression.
+## Main skills demonstrated
 
-Reference: https://bioconductor.org/packages/slingshot/
-
-### 12. Candidate ligand–receptor exploration
-
-Expression of selected ligand and receptor genes was compared across annotated cell populations.
-
-This analysis provides a descriptive view of potentially compatible ligand–receptor expression patterns. Importantly, co-expression of a ligand and its receptor does **not** demonstrate actual cell-cell communication. A dedicated interaction-inference framework would be required for that conclusion.
-
-### 13. AUCell gene-signature analysis
-
-**AUCell** was used to estimate the enrichment of predefined gene signatures at the individual-cell level.
-
-The analysis included illustrative myeloid and B-cell signatures and provided an independent way to examine whether expected transcriptional programs were enriched in their corresponding cell populations.
-
-Reference: https://bioconductor.org/packages/AUCell/
-
-## Main output files
-
-The analysis generates several figures and tables, including:
-
-- QC violin plots;
-- RNA-count / gene-count scatterplots;
-- predicted-doublet visualizations;
-- cell-cycle PCA;
-- PCA elbow plot;
-- global UMAP clustering;
-- canonical-marker DotPlot;
-- annotated UMAP;
-- T/NK sub-clustering UMAP;
-- T/NK marker DotPlot;
-- monocyte pseudotime representation;
-- ligand–receptor candidate-expression DotPlot;
-- AUCell signature maps;
-- complete marker-gene tables;
-- top marker genes per cluster;
-- cell-type abundance summary;
-- serialized Seurat object.
-
-## Project structure
-
-```text
-project/
-│
-├── 01_projet.R
-├── README.md
-│
-├── 03_results/
-│   ├── figures
-│   ├── marker tables
-│   ├── cell-type summary
-│   └── Seurat object
-│
-└── report/
-    └── scRNA-seq analysis report
-```
-
-## Software and main R packages
-
-The workflow was developed in R using mainly:
-
-- Seurat
-- SeuratData
-- scDblFinder
-- SingleCellExperiment
-- Slingshot
-- AUCell
-- ggplot2
-- dplyr
-- patchwork
-
-A random seed was set during the analysis to improve reproducibility of stochastic steps.
+- single-cell RNA-seq quality control
+- Seurat-based preprocessing and clustering
+- SCTransform normalization
+- PCA and UMAP
+- graph-based clustering
+- differential marker analysis
+- manual immune-cell annotation
+- doublet detection
+- sub-clustering
+- pseudotime analysis
+- gene-signature scoring
+- biologically cautious interpretation of exploratory analyses
 
 ## Interpretation and limitations
 
-This project is designed as a complete analytical workflow and educational study of PBMC single-cell transcriptomics.
+This project uses a small public reference dataset and is intended as a methodological single-cell analysis project rather than a discovery cohort study.
 
-Several limitations should be considered:
+Important limitations include:
 
-- the PBMC 3k dataset represents a small reference dataset rather than a biological cohort;
-- cell-type annotation is based primarily on transcriptomic marker expression;
-- UMAP is a visualization method and does not provide a direct quantitative biological distance;
-- pseudotime represents an inferred transcriptional ordering and not real chronological time;
-- candidate ligand–receptor expression does not establish functional cell-cell communication;
-- fine immune-cell subtypes should ideally be validated using additional markers, reference mapping or complementary experimental information.
+- PBMC 3k is a reference dataset rather than an independent biological cohort;
+- cell-type annotation is primarily transcriptome-based;
+- UMAP is a visualization and should not be interpreted as a quantitative biological distance;
+- pseudotime is an inferred ordering, not real time;
+- ligand-receptor co-expression does not prove cellular communication;
+- fine immune-cell states should be validated with additional markers, reference mapping or complementary experimental information.
 
-## Reproducibility
+## Reproducibility principles
 
-The project was organized so that the main analysis can be reproduced from the original PBMC 3k dataset.
+The workflow was designed around explicit analytical choices and a fixed random seed. For a fully reproducible scRNA-seq project, the following should always be recorded with the analysis:
 
-For full reproducibility, the following should be retained with the analysis:
+- R version
+- package versions
+- random seed
+- QC thresholds
+- number of principal components
+- clustering resolution
+- session information
 
-- R version;
-- package versions;
-- random seed;
-- QC thresholds;
-- number of principal components;
-- clustering resolution;
-- R session information.
+## Selected references
 
-## Use of artificial intelligence
+1. Stuart T. et al. **Comprehensive Integration of Single-Cell Data.** Cell, 2019.  
+   https://doi.org/10.1016/j.cell.2019.05.031
 
-Artificial intelligence was used as a **support tool** during the development of this project.
+2. Hao Y. et al. **Integrated analysis of multimodal single-cell data.** Cell, 2021.  
+   https://doi.org/10.1016/j.cell.2021.04.048
 
-More specifically, **ChatGPT (OpenAI)** was used to assist with:
+3. Hafemeister C., Satija R. **Normalization and variance stabilization of single-cell RNA-seq data using regularized negative binomial regression.** Genome Biology, 2019.  
+   https://doi.org/10.1186/s13059-019-1874-1
 
-- reviewing and debugging parts of the R code;
-- improving code clarity and organization;
-- correcting and optimizing sections of the analysis workflow;
-- identifying potential inconsistencies or fragile implementation choices;
-- improving the structure, wording and scientific clarity of the written report;
-- helping ensure that biological interpretations were appropriately qualified and did not exceed what the analyses could support.
+4. Germain P.-L. et al. **Doublet identification in single-cell sequencing data using scDblFinder.** F1000Research, 2021.  
+   https://doi.org/10.12688/f1000research.73600.1
 
-The analyses were executed and inspected by the author, and the final methodological choices, biological interpretation and validation of the project remained under the responsibility of the author.
-
-AI assistance was therefore used for **code correction, optimization and editorial support**, and not as a substitute for scientific validation, critical interpretation or authorship responsibility.
+5. Street K. et al. **Slingshot: cell lineage and pseudotime inference for single-cell transcriptomics.** BMC Genomics, 2018.  
+   https://doi.org/10.1186/s12864-018-4772-0
 
 ## Author
 
 **Nahi El Akoum**  
 Master 2 — Artificial Intelligence and Data Analysis in Biology (AIDA)  
 Sorbonne Université
-
-## Selected references
-
-1. Stuart T. et al. *Comprehensive Integration of Single-Cell Data*. Cell, 2019. https://doi.org/10.1016/j.cell.2019.05.031
-2. Hao Y. et al. *Integrated analysis of multimodal single-cell data*. Cell, 2021. https://doi.org/10.1016/j.cell.2021.04.048
-3. Hafemeister C., Satija R. *Normalization and variance stabilization of single-cell RNA-seq data using regularized negative binomial regression*. Genome Biology, 2019. https://doi.org/10.1186/s13059-019-1874-1
-4. Germain P.-L. et al. *Doublet identification in single-cell sequencing data using scDblFinder*. F1000Research, 2021. https://doi.org/10.12688/f1000research.73600.1
-5. Street K. et al. *Slingshot: cell lineage and pseudotime inference for single-cell transcriptomics*. BMC Genomics, 2018. https://doi.org/10.1186/s12864-018-4772-0
-6. Aibar S. et al. *SCENIC: single-cell regulatory network inference and clustering*. Nature Methods, 2017. https://doi.org/10.1038/nmeth.4463
-
-## License
-
-This repository is intended for educational and academic use.
-
-If the project or part of the workflow is reused, please cite the original software packages and publications on which the analysis is based.
